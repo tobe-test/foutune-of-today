@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 관상 & 오늘의 운세</title>
+    <style>
+        /* Google Fonts Noto Sans KR */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+        /* 기본 스타일 */
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        /* 앱 전체 컨테이너 */
+        .app-container {
+            width: 100%;
+            max-width: 420px;
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+        }
+
+        /* 각 화면 공통 스타일 */
+        .screen {
+            padding: 30px;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+        
+        h2 {
+            font-size: 20px;
+            color: #0056b3;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 25px;
+        }
+
+        /* 버튼 스타일 */
+        .btn {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px 0 rgba(0, 123, 255, 0.3);
+            width: 100%;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(0, 123, 255, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* 화면 숨김 처리 */
+        .hidden {
+            display: none;
+        }
+
+        /* 카메라 화면 스타일 */
+        #camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 360px;
+            margin: 20px auto;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        #webcam {
+            width: 100%;
+            height: auto;
+            transform: scaleX(-1); /* 거울 모드 */
+        }
+
+        #overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1); /* 거울 모드 */
+        }
+
+        /* 로딩 화면 스타일 */
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #007bff;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 30px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 결과 화면 스타일 */
+        #result-screen {
+            text-align: left;
+        }
+        
+        .result-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .result-section h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        
+        .result-section p {
+            font-size: 15px;
+            margin: 0;
+            color: #555;
+            line-height: 1.5;
+            white-space: pre-wrap; /* 줄바꿈 적용 */
+        }
+        
+        .error-message {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- 시작 화면 -->
+        <div id="start-screen" class="screen">
+            <h1>AI 관상 & 오늘의 운세</h1>
+            <p>카메라로 얼굴을 비추면 AI가 당신의 관상을 분석하고 오늘의 운세를 알려드립니다.</p>
+            <p style="font-size: 12px; color: #888;">⚠️ 분석은 브라우저 내에서만 이루어지며, 어떤 이미지도 서버로 전송되거나 저장되지 않습니다.</p>
+            <button id="start-btn" class="btn">시작하기</button>
+        </div>
+
+        <!-- 카메라 촬영 화면 -->
+        <div id="camera-screen" class="screen hidden">
+            <h1>얼굴을 비춰주세요</h1>
+            <p>얼굴이 인식되면 버튼이 활성화됩니다.</p>
+            <div id="camera-container">
+                <video id="webcam" autoplay playsinline></video>
+                <canvas id="overlay-canvas"></canvas>
+            </div>
+            <button id="capture-btn" class="btn" disabled>분석하기</button>
+        </div>
+
+        <!-- 로딩 화면 -->
+        <div id="loading-screen" class="screen hidden">
+            <h1>AI가 분석 중입니다</h1>
+            <p>잠시만 기다려주세요...</p>
+            <div class="loader"></div>
+        </div>
+
+        <!-- 결과 화면 -->
+        <div id="result-screen" class="screen hidden">
+            <h2>🧐 관상 분석 결과</h2>
+            <div id="physiognomy-results"></div>
+            
+            <h2>✨ 오늘의 운세</h2>
+            <div id="fortune-results"></div>
+
+            <div id="error-display" class="error-message hidden"></div>
+            <button id="retry-btn" class="btn">다시하기</button>
+        </div>
+    </div>
+
+    <!-- MediaPipe Face Landmarker 스크립트 -->
+    <script type="module">
+        import {
+            FaceLandmarker,
+            FilesetResolver
+        } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
+        // DOM 요소 가져오기
+        const startScreen = document.getElementById('start-screen');
+        const cameraScreen = document.getElementById('camera-screen');
+        const loadingScreen = document.getElementById('loading-screen');
+        const resultScreen = document.getElementById('result-screen');
+
+        const startBtn = document.getElementById('start-btn');
+        const captureBtn = document.getElementById('capture-btn');
+        const retryBtn = document.getElementById('retry-btn');
+
+        const video = document.getElementById("webcam");
+        const canvasElement = document.getElementById("overlay-canvas");
+        const canvasCtx = canvasElement.getContext("2d");
+        
+        const physiognomyResultsEl = document.getElementById('physiognomy-results');
+        const fortuneResultsEl = document.getElementById('fortune-results');
+        const errorDisplayEl = document.getElementById('error-display');
+
+        let faceLandmarker;
+        let runningMode = "VIDEO";
+        let lastVideoTime = -1;
+        let faceLandmarks;
+
+        // MediaPipe FaceLandmarker 초기화
+        async function createFaceLandmarker() {
+            const filesetResolver = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+            );
+            faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                    delegate: "GPU"
+                },
+                outputFaceBlendshapes: true,
+                runningMode,
+                numFaces: 1
+            });
+            startBtn.disabled = false;
+            startBtn.innerText = "시작하기";
+        }
+        
+        // 시작 버튼 비활성화 및 로딩 텍스트 설정
+        startBtn.disabled = true;
+        startBtn.innerText = "AI 모델 로딩 중...";
+        createFaceLandmarker();
+
+        // 웹캠 시작 함수
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.addEventListener("loadeddata", predictWebcam);
+            } catch (err) {
+                console.error("웹캠 접근 오류:", err);
+                alert("카메라 권한이 필요합니다. 브라우저 설정에서 카메라 접근을 허용해주세요.");
+                // 화면 초기화
+                cameraScreen.classList.add('hidden');
+                startScreen.classList.remove('hidden');
+            }
+        }
+
+        // 실시간 얼굴 특징점 예측 함수
+        async function predictWebcam() {
+            if (video.videoWidth === 0) {
+                requestAnimationFrame(predictWebcam);
+                return;
+            }
+            
+            canvasElement.width = video.videoWidth;
+            canvasElement.height = video.videoHeight;
+            
+            let startTimeMs = performance.now();
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                const results = faceLandmarker.detectForVideo(video, startTimeMs);
+                faceLandmarks = results.faceLandmarks;
+            }
+
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            if (faceLandmarks && faceLandmarks.length > 0) {
+                // 얼굴 특징점 그리기
+                for (const landmarks of faceLandmarks) {
+                    // 얼굴 윤곽선
+                    drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: "rgba(0, 255, 255, 0.5)", lineWidth: 0.5 });
+                    // 눈썹
+                    drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW, { color: "rgba(255, 255, 0, 0.7)" });
+                    drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, { color: "rgba(255, 255, 0, 0.7)" });
+                    // 눈
+                    drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, { color: "rgba(0, 255, 0, 0.7)" });
+                    drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, { color: "rgba(0, 255, 0, 0.7)" });
+                    // 입술
+                    drawConnectors(canvasCtx, landmarks, FaceLandmarker.FACE_LANDMARKS_LIPS, { color: "rgba(255, 0, 0, 0.7)" });
+                }
+                captureBtn.disabled = false;
+                captureBtn.innerText = "분석하기";
+            } else {
+                captureBtn.disabled = true;
+                captureBtn.innerText = "얼굴을 인식시켜주세요";
+            }
+            
+            if (runningMode === "VIDEO") {
+                window.requestAnimationFrame(predictWebcam);
+            }
+        }
+        
+        // 특징점 연결선 그리기 헬퍼 함수
+        function drawConnectors(ctx, landmarks, connectors, options) {
+            ctx.beginPath();
+            for (const connector of connectors) {
+                const start = landmarks[connector.start];
+                const end = landmarks[connector.end];
+                ctx.moveTo(start.x * canvasElement.width, start.y * canvasElement.height);
+                ctx.lineTo(end.x * canvasElement.width, end.y * canvasElement.height);
+            }
+            ctx.lineWidth = options.lineWidth || 2;
+            ctx.strokeStyle = options.color || "#FFFFFF";
+            ctx.stroke();
+        }
+
+        // 얼굴 특징을 간단한 텍스트로 분석하는 함수
+        function analyzeFaceFeatures(landmarks) {
+            if (!landmarks || landmarks.length === 0) return "얼굴 특징을 분석할 수 없습니다.";
+            
+            const lm = landmarks[0];
+            let analysis = [];
+
+            // 1. 얼굴형 (상/중/하안부 비율)
+            const foreheadTop = lm[10]; // 이마 위
+            const eyebrowMid = lm[105]; // 미간
+            const noseBottom = lm[2];   // 코 끝
+            const chinBottom = lm[152]; // 턱 끝
+            
+            const upperFace = Math.abs(foreheadTop.y - eyebrowMid.y);
+            const middleFace = Math.abs(eyebrowMid.y - noseBottom.y);
+            const lowerFace = Math.abs(noseBottom.y - chinBottom.y);
+            const total = upperFace + middleFace + lowerFace;
+
+            const upperRatio = (upperFace / total * 100).toFixed(1);
+            const middleRatio = (middleFace / total * 100).toFixed(1);
+            const lowerRatio = (lowerFace / total * 100).toFixed(1);
+
+            analysis.push(`- 얼굴 비율: 상안부 ${upperRatio}%, 중안부 ${middleRatio}%, 하안부 ${lowerRatio}%로 균형이 잘 잡혀 있습니다.`);
+            if(upperRatio > 35) analysis.push("- 이마가 넓어 지적이고 창의적인 면모를 보입니다.");
+            if(middleRatio > 35) analysis.push("- 중안부가 발달하여 자존심과 실행력이 강합니다.");
+            if(lowerRatio > 35) analysis.push("- 하관이 발달하여 의지력이 강하고 말년운이 좋습니다.");
+
+            // 2. 눈썹 모양 (기울기)
+            const leftEyebrowOuter = lm[283];
+            const leftEyebrowInner = lm[300];
+            const eyebrowTilt = (leftEyebrowInner.y - leftEyebrowOuter.y).toFixed(3);
+            if(eyebrowTilt > 0.01) analysis.push("- 눈썹 끝이 올라가 있어 긍정적이고 진취적인 성향입니다.");
+            else if (eyebrowTilt < -0.01) analysis.push("- 눈썹 끝이 내려가 있어 온화하고 사려 깊은 성품입니다.");
+            else analysis.push("- 눈썹이 수평에 가까워 이성적이고 안정적인 성향입니다.");
+
+            // 3. 입꼬리 모양
+            const lipCornerLeft = lm[61];
+            const lipCornerRight = lm[291];
+            const lipCenter = lm[13];
+            const mouthCornerAvgY = (lipCornerLeft.y + lipCornerRight.y) / 2;
+            if(mouthCornerAvgY < lipCenter.y) analysis.push("- 입꼬리가 올라가 있어 낙천적이고 대인관계가 원만합니다.");
+            else analysis.push("- 입꼬리가 처져 보일 수 있으나, 신중하고 책임감이 강한 면모를 보입니다.");
+            
+            return analysis.join("\n");
+        }
+
+        // Gemini API를 호출하여 운세 생성
+        async function getFortuneFromLLM(analysisText) {
+            const apiKey = ""; // Gemini API 키를 여기에 입력하세요.
+            if (!apiKey) {
+                console.warn("Gemini API 키가 설정되지 않았습니다. 샘플 응답을 사용합니다.");
+                return {
+                    physiognomy: "AI가 분석한 당신의 관상은 다음과 같습니다:\n" + analysisText,
+                    fortune: "✨ 오늘의 운세 ✨\n\n종합운: AI 엔진이 활기차게 돌아가는 것처럼, 당신의 에너지도 최고조에 달하는 날입니다. 새로운 프로젝트를 시작하기에 완벽한 하루!\n\n재물운: 뜻밖의 장소에서 작은 행운(예: 잊고 있던 비상금)을 발견할 수 있습니다.\n\n애정운: 당신의 미소는 최고의 알고리즘! 긍정적인 표정 하나로 주변 사람들의 호감을 얻을 수 있습니다."
+                };
+            }
+            
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const prompt = `
+당신은 유머러스하고 긍정적인 기운을 주는 AI 관상가이자 운세 전문가입니다.
+아래의 얼굴 특징 분석 데이터를 바탕으로, 한 사람을 위한 '관상 분석 결과'와 '오늘의 운세'를 상세하고 재미있게 작성해주세요.
+
+[얼굴 특징 분석 데이터]
+${analysisText}
+
+[작성 규칙]
+1.  **관상 분석 결과**: 분석 데이터를 자연스러운 문장으로 풀어서 설명해주세요. 긍정적인 면을 부각해서 이야기해주세요.
+2.  **오늘의 운세**: '종합운', '재물운', '애정운' 세 가지 항목으로 나누어 구체적이고 희망적인 메시지를 담아 작성해주세요.
+3.  전체적으로 친근하고 따뜻한 말투를 사용해주세요.
+4.  결과는 JSON 형식으로, 'physiognomy'와 'fortune' 두 개의 키를 가진 객체로 반환해주세요.
+
+예시 JSON 출력:
+{
+  "physiognomy": "얼굴 비율이 조화롭고 눈썹에서 진취적인 기상이 느껴집니다. 이는...",
+  "fortune": "종합운: ...\\n재물운: ...\\n애정운: ..."
+}
+`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                           responseMimeType: "application/json",
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const text = data.candidates[0].content.parts[0].text;
+                return JSON.parse(text);
+
+            } catch (error) {
+                console.error("Gemini API 호출 오류:", error);
+                errorDisplayEl.innerText = `운세 정보를 가져오는 데 실패했습니다: ${error.message}`;
+                errorDisplayEl.classList.remove('hidden');
+                return null;
+            }
+        }
+        
+        // 결과 렌더링 함수
+        function renderResult(data, key, element) {
+            element.innerHTML = ''; // 기존 내용 초기화
+            const p = document.createElement('p');
+            p.innerText = data;
+            const section = document.createElement('div');
+            section.className = 'result-section';
+            section.appendChild(p);
+            element.appendChild(section);
+        }
+
+        // --- 이벤트 리스너 ---
+
+        // 시작 버튼
+        startBtn.addEventListener('click', () => {
+            startScreen.classList.add('hidden');
+            cameraScreen.classList.remove('hidden');
+            startWebcam();
+        });
+
+        // 분석하기 버튼
+        captureBtn.addEventListener('click', async () => {
+            runningMode = "IMAGE"; // 예측 루프 중단
+            video.pause();
+            
+            cameraScreen.classList.add('hidden');
+            loadingScreen.classList.remove('hidden');
+            
+            // 1. 얼굴 특징 텍스트 분석
+            const analysisText = analyzeFaceFeatures(faceLandmarks);
+            
+            // 2. Gemini API로 운세 생성
+            const fortuneData = await getFortuneFromLLM(analysisText);
+            
+            loadingScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+
+            // 3. 결과 표시
+            if (fortuneData) {
+                renderResult(fortuneData.physiognomy, 'physiognomy', physiognomyResultsEl);
+                renderResult(fortuneData.fortune, 'fortune', fortuneResultsEl);
+                errorDisplayEl.classList.add('hidden');
+            } else {
+                // 에러 발생 시 기본 텍스트 표시
+                physiognomyResultsEl.innerHTML = '<p>관상 분석 결과를 불러오지 못했습니다.</p>';
+                fortuneResultsEl.innerHTML = '<p>오늘의 운세 정보를 불러오지 못했습니다.</p>';
+            }
+        });
+
+        // 다시하기 버튼
+        retryBtn.addEventListener('click', () => {
+            resultScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            
+            // 웹캠 스트림 정지
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            runningMode = "VIDEO"; // 모드 초기화
+        });
+
+    </script>
+</body>
+</html>
